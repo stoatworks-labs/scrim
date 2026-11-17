@@ -39,8 +39,9 @@
 #   clips         Resolume's demo clips: alpha honoured on both inputs, and
 #                 Front Light's and Back Light's defaults re-measured
 #                 (tools/clips.py). Needs /Applications/Resolume Arena/media.
-#   bench         the render cost at 720p and 1080p, for the record. Not
-#                 pass/fail.
+#   bench         the render cost at 720p and 1080p, each frame timed alone
+#                 on the GPU's clock, for the record: the times are not
+#                 pass/fail; a frame that fails to render is.
 #
 #     TMPDIR=<scratch> OXBOW=/path/to/oxbow tools/verify.sh [BUILD_DIR]
 #
@@ -267,14 +268,16 @@ if [ "$status" -eq 0 ] && [ "$got" -eq $(( FRAME * 2 )) ]; then
 else
 	fail "2.5 frames in gave $got bytes (want $(( FRAME * 2 ))), exit $status"
 fi
-# Cues: Front Light ramps 0 -> host 0.5 over frames 0..2; Draw Mesh steps off
-# -> on at frame 4. A grey projection, nothing behind:
+# Cues: Front Light ramps 0 -> host 0.5 over frames 0..2; Linear Light steps
+# off -> on at frame 4. A grey projection, nothing behind:
 #   frames 0 < 1 < 2   the ramp (a STEPPED Front Light would be 0, 0, 0.5)
-#   frames 2 = 3       Draw Mesh still off (a RAMPED Draw Mesh is 0.75 at 3: on)
+#   frames 2 = 3       Linear Light still off (a RAMPED one is 0.75 at 3: on)
 #   frames 3 != 4 = 5  the step
+# (Not Draw Mesh: at 64x36 a 9.5 m gauze puts ~59 weave cells in a pixel, so
+# the weave per pixel and its average are the same bytes.)
 frames 6 128 128 128 255 > "$tmp/grey6.rgba"
 frames 6 0 0 0 255 > "$tmp/black6.rgba"
-printf '0 Front Light 0\n2 Front Light 0.5\n0 Draw Mesh 0\n4 Draw Mesh 1\n' > "$tmp/cues.txt"
+printf '0 Front Light 0\n2 Front Light 0.5\n0 Linear Light 0\n4 Linear Light 1\n' > "$tmp/cues.txt"
 status=0
 "$SMTEST" --pipe --size ${W}x${H} --pipe-src "$tmp/grey6.rgba" --script "$tmp/cues.txt" < "$tmp/black6.rgba" > "$tmp/cued.rgba" 2>/dev/null || status=$?
 verdict=$( python3 -I - "$tmp/cued.rgba" $FRAME <<'PY'
@@ -289,7 +292,7 @@ print( ( "ok " if ok else "bad " ) + " ".join( f"{v:.1f}" for v in m ) )
 PY
 )
 case "$status:$verdict" in
-	0:ok*) pass "cues: Front Light ramps, Draw Mesh steps (mean red ${verdict#ok })" ;;
+	0:ok*) pass "cues: Front Light ramps, Linear Light steps (mean red ${verdict#ok })" ;;
 	*) fail "cues gave exit $status, '${verdict#bad }': want a rising ramp over 0..2, equal 2 and 3, a step at 4" ;;
 esac
 printf '0 No Such Control 0.5\n' > "$tmp/bad.txt"
@@ -440,7 +443,12 @@ fi
 #---------------------------------------------------------------------------
 step "bench"
 #---------------------------------------------------------------------------
-"$SMTEST" --bench --frames 30 2>&1 | sed -n '4,6p' | sed 's/^/   /'
+# The times are for the record; a frame that failed to render, or a blank
+# output, is a failure.
+status=0
+"$SMTEST" --bench --frames 60 > "$LOGS/bench.txt" 2>&1 || status=$?
+sed 's/^/   /' "$LOGS/bench.txt"
+[ "$status" -eq 0 ] && pass "bench: every frame rendered and drew" || fail "bench exited $status ($LOGS/bench.txt)"
 
 printf '\n'
 if [ "$failures" -eq 0 ]; then

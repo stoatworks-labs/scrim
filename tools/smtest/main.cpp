@@ -1354,11 +1354,23 @@ int runMutation()
 //Enough frames for the GPU to leave its idle clock (penumbra's lesson).
 constexpr int kBenchWarmUp = 60;
 
-double benchAt( int width, int height, int frames, bool worst )
+struct BenchResult
 {
+	double gpu  = -1.0;///< ms/frame, the median of GL_TIME_ELAPSED around each frame
+	double wall = -1.0;///< ms/frame, the median wall clock from Render to glFinish
+};
+
+//Frames are timed one at a time. Queued back to back into the same framebuffer
+//with glFinish only at the ends, 120 frames of the biggest disc at 1080p timed
+//0.03 ms/frame where each alone takes 2.3 ms on the GPU's own clock: the queued
+//figure measures nothing. (Probably the tile renderer's hidden-surface removal
+//shading only the last of a run of opaque full-screen draws; not proven.)
+BenchResult benchAt( int width, int height, int frames, bool worst )
+{
+	BenchResult result;
 	MixRig rig;
 	if( !rig.Init( width, height ) )
-		return -1.0;
+		return result;
 	rig.UploadDest( stageCard( width, height ) );
 	rig.UploadSrc( projectionCard( width, height ) );
 	if( worst )
@@ -1369,15 +1381,44 @@ double benchAt( int width, int height, int frames, bool worst )
 		rig.SetIndex( Scrim::PT_SPILL_DISTANCE, 1.0f );
 		rig.SetIndex( Scrim::PT_AUDIENCE, 1.0f );
 	}
+	//Every frame must have rendered, or the time is of nothing.
+	bool rendered = true;
 	for( int frame = 0; frame < kBenchWarmUp; ++frame )
-		rig.Render();
-	glFinish();
-	const auto start = std::chrono::steady_clock::now();
+	{
+		rendered = rig.Render() && rendered;
+		glFinish();
+	}
+	std::vector< double > gpu, wall;
+	GLuint query = 0;
+	glGenQueries( 1, &query );
 	for( int frame = 0; frame < frames; ++frame )
-		rig.Render();
-	glFinish();
-	const auto end = std::chrono::steady_clock::now();
-	return std::chrono::duration< double >( end - start ).count() * 1000.0 / frames;
+	{
+		const auto a = std::chrono::steady_clock::now();
+		glBeginQuery( GL_TIME_ELAPSED, query );
+		rendered = rig.Render() && rendered;
+		glEndQuery( GL_TIME_ELAPSED );
+		glFinish();
+		wall.push_back( std::chrono::duration< double >( std::chrono::steady_clock::now() - a ).count() * 1000.0 );
+		GLuint64 ns = 0;
+		glGetQueryObjectui64v( query, GL_QUERY_RESULT, &ns );
+		gpu.push_back( static_cast< double >( ns ) / 1.0e6 );
+	}
+	glDeleteQueries( 1, &query );
+	//And the picture is not the clear colour: the pass drew.
+	const Image last = rig.Pixels();
+	size_t lit       = 0;
+	for( size_t i = 0; i < last.size(); i += 4 )
+		lit += last[ i ] != 0 || last[ i + 1 ] != 0 || last[ i + 2 ] != 0;
+	if( !rendered || lit < last.size() / 32 )
+	{
+		std::fprintf( stderr, "bench: a frame failed to render, or the output is blank (%zu lit pixels)\n", lit );
+		return result;
+	}
+	std::sort( gpu.begin(), gpu.end() );
+	std::sort( wall.begin(), wall.end() );
+	result.gpu  = gpu[ gpu.size() / 2 ];
+	result.wall = wall[ wall.size() / 2 ];
+	return result;
 }
 
 int runBench( int frames )
@@ -1388,16 +1429,19 @@ int runBench( int frames )
 		int width, height;
 	};
 	const Size sizes[] = { { "1280x720 ", 1280, 720 }, { "1920x1080", 1920, 1080 } };
-	std::printf( "%d frames each after a %d-frame warm-up, glFinish both sides; Dest and Src at the output size.\n", frames, kBenchWarmUp );
-	std::printf( "defaults, then the biggest defocus disc the controls allow (Gauze Width 2 m, Spill Distance 3, Audience 16).\n\n" );
-	std::printf( "resolution     defaults ms/frame   %% of 60fps   | biggest disc ms/frame   %% of 60fps\n" );
+	double load[ 3 ]   = { 0.0, 0.0, 0.0 };
+	getloadavg( load, 3 );
+	std::printf( "%d frames, each timed alone after a %d-frame warm-up; Dest and Src at the output size. Load average %.1f.\n", frames, kBenchWarmUp, load[ 0 ] );
+	std::printf( "gpu = GL_TIME_ELAPSED around the frame; wall = Render to glFinish. Medians, ms/frame.\n" );
+	std::printf( "Defaults, then the biggest defocus disc the controls allow (2 m gauze, Spill 3, Audience 16).\n\n" );
+	std::printf( "resolution   defaults:   gpu     wall | biggest disc:   gpu     wall\n" );
 	for( const Size& size : sizes )
 	{
-		const double plain = benchAt( size.width, size.height, frames, false );
-		const double big   = benchAt( size.width, size.height, frames, true );
-		if( plain < 0.0 || big < 0.0 )
+		const BenchResult plain = benchAt( size.width, size.height, frames, false );
+		const BenchResult big   = benchAt( size.width, size.height, frames, true );
+		if( plain.gpu < 0.0 || big.gpu < 0.0 )
 			return 1;
-		std::printf( "%s        %7.3f          %5.1f%%     |        %7.3f           %5.1f%%\n", size.name, plain, plain / 16.667 * 100.0, big, big / 16.667 * 100.0 );
+		std::printf( "%s             %7.3f  %7.3f |               %7.3f  %7.3f\n", size.name, plain.gpu, plain.wall, big.gpu, big.wall );
 	}
 	return 0;
 }
