@@ -33,9 +33,12 @@ inline constexpr double kLightMax = 16.0;
 /// at the default, the median demo clip's 99th-percentile brightest output
 /// channel reaches the top code, projected on the gauze with nothing behind
 /// (Front Light), and seen through the gauze with nothing projected (Back
-/// Light), at the default gauze, 640x360.
-inline constexpr double kFrontDefault = 2.9171;
-inline constexpr double kBackDefault  = 1.8929;
+/// Light), at the default gauze, 640x360. Measured 2026-11-17 over Arena's
+/// 33 clips: the median clip is Shop74/Cyberspace_09 both times, p99
+/// 0.08152311 linear at Front Light 1 and 0.12456560 at Back Light 1, so
+/// 1 / those. Each alone fills the range; both at once clip (AGENTS.md).
+inline constexpr double kFrontDefault = 12.2665;
+inline constexpr double kBackDefault  = 8.0279;
 
 /// Pixel Fill: the projector's mirror fill factor, 0.5 to 1, linear. TI
 /// DLP7000 data sheet (DLPS026G, revised 2023-04): "Array fill factor 92%".

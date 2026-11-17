@@ -389,6 +389,78 @@ void mixerCheck( int outW, int outH, int fault )
 	rig.UploadDest( flatField( dest.usedW, dest.usedH, kBlack ) );
 	rig.Render();
 	quadrantsMatch( rig.Pixels(), outW, outH, src, shown, "Src alone" );
+
+	//The resampling itself: a bilinear of a linear ramp is the ramp, so a
+	//float ramp across (red) and down (green) on each input, resized, comes
+	//back as ( x + 0.5 ) / outW and ( y + 0.5 ) / outH exactly, inside the
+	//half texel at each end where the edge clamps.
+	const InputSpec rampSpecs[ 2 ] = { InputSpec::Padded( dest.usedW, dest.usedH, dest.hwW, dest.hwH, true ),
+		                               InputSpec::Padded( src.usedW, src.usedH, src.hwW, src.hwH, true ) };
+	MixRig ramp;
+	if( !ramp.Init( outW, outH, rampSpecs[ 0 ], rampSpecs[ 1 ], true, fault ) )
+	{
+		Check( false, "the ramp rig initialises" );
+		return;
+	}
+	auto rampCard = []( const InputSpec& sp ) {
+		ImageF img( static_cast< size_t >( sp.usedW ) * sp.usedH * 4 );
+		for( int y = 0; y < sp.usedH; ++y )
+			for( int x = 0; x < sp.usedW; ++x )
+			{
+				const size_t i = at4( sp.usedW, x, y );
+				img[ i + 0 ]   = static_cast< float >( ( x + 0.5 ) / sp.usedW );
+				img[ i + 1 ]   = static_cast< float >( ( y + 0.5 ) / sp.usedH );
+				img[ i + 2 ]   = 0.5f;
+				img[ i + 3 ]   = 1.0f;
+			}
+		return img;
+	};
+	const ImageF black = flatFieldF( outW, outH, 0, 0, 0, 1 );
+	for( int which = 0; which < 2; ++which )
+	{
+		const InputSpec& sp = rampSpecs[ which ];
+		Gauze r;
+		r.linear   = false;
+		r.drawMesh = false;
+		if( which == 0 )
+		{
+			r.opacity = 0.0;
+			r.open    = 0.25;
+			r.back    = 4.0;
+			ramp.UploadDest( rampCard( sp ) );
+			ramp.UploadSrc( flatFieldF( sp.usedW, sp.usedH, 0, 0, 0, 1 ) );
+		}
+		else
+		{
+			r.open  = 0.75;
+			r.front = 4.0;
+			r.back  = 0.0;
+			ramp.UploadSrc( rampCard( rampSpecs[ 1 ] ) );
+			ramp.UploadDest( flatFieldF( rampSpecs[ 0 ].usedW, rampSpecs[ 0 ].usedH, 0, 0, 0, 1 ) );
+		}
+		apply( ramp.plugin, r );
+		ramp.Render();
+		const ImageF out = ramp.PixelsF();
+		double worst     = 0.0;
+		long inside      = 0;
+		for( int y = 0; y < outH; ++y )
+			for( int x = 0; x < outW; ++x )
+			{
+				const double u = ( x + 0.5 ) * sp.usedW / outW, v = ( y + 0.5 ) * sp.usedH / outH;
+				if( u < 0.5 || u > sp.usedW - 0.5 || v < 0.5 || v > sp.usedH - 0.5 )
+					continue;
+				worst = worse( worst, std::fabs( channel( out, outW, x, y, 0 ) - ( x + 0.5 ) / outW ) );
+				worst = worse( worst, std::fabs( channel( out, outW, x, y, 1 ) - ( y + 0.5 ) / outH ) );
+				++inside;
+			}
+		//Counted roundings: the texel's value (1), u and its fraction (4),
+		//two mixes of two (4), the unit gain's products (exact) -- ten, x3.
+		const double tol = 3.0 * 10.0 * kFloatUlp;
+		Check( inside > outW * outH / 2 && within( worst, tol ),
+		       std::string( which == 0 ? "Dest" : "Src" )
+		           + fmt( ", a float ramp at %.0fx%.0f: the bilinear by hand gives the ramp back at %.0f pixels (worst %.3g, ", sp.usedW, sp.usedH, inside, worst )
+		           + fmt( "tolerance %.3g: ten counted float roundings, x3)", tol ) );
+	}
 }
 
 /// The host's GL state as the plugin found it: no texture on any unit it
@@ -1647,7 +1719,7 @@ int runPipe( int width, int height, int srcWidth, int srcHeight, const std::stri
 				bytes[ i + 3 ] = toByte( f[ i + 3 ] );
 			}
 			const double p99 = frame.At( 0.99 );
-			std::fprintf( stderr, "frame %d p99 brightest channel %.6f linear %.6f\n", index, p99, srgbToLinear( p99 ) );
+			std::fprintf( stderr, "frame %d p99 brightest channel %.8f linear %.8f\n", index, p99, srgbToLinear( p99 ) );
 			flipRows( bytes, out, width, height );
 		}
 		else
@@ -1664,7 +1736,7 @@ int runPipe( int width, int height, int srcWidth, int srcHeight, const std::stri
 	if( stats )
 	{
 		const double p99 = pooled.At( 0.99 );
-		std::fprintf( stderr, "smtest --pipe: %d frames; over every pixel of every frame, p99 brightest channel %.6f linear %.6f\n", index, p99, srgbToLinear( p99 ) );
+		std::fprintf( stderr, "smtest --pipe: %d frames; over every pixel of every frame, p99 brightest channel %.8f linear %.8f\n", index, p99, srgbToLinear( p99 ) );
 	}
 	else
 		std::fprintf( stderr, "smtest --pipe: %d frames\n", index );

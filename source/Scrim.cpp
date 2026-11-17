@@ -68,7 +68,10 @@ Scrim::Scrim()
 	//above, read by the host through different function codes entirely.
 	SetMinInputs( 2 );
 	SetMaxInputs( 2 );
-	//The SDK leaves its clock uninitialised until a host calls SetTime.
+	//Nothing moves with time, so the host is told not to send it. The SDK
+	//leaves its clock uninitialised until a host calls SetTime; read only by
+	//kFaultClock, which the harness drives through SetTime directly.
+	SetTimeSupported( false );
 	hostTime = 0.0;
 
 	//---------------------------------------------------------------------
