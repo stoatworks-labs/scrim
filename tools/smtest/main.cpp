@@ -36,6 +36,8 @@
 
 #include "Harness.h"
 
+#include <thread>
+
 namespace
 {
 
@@ -1245,14 +1247,83 @@ int runAlpha()
 
 //---------------------------------------------------------------------------
 // --state: no state across frames and no clock.
+//
+// On this Mac's GPU every comparison is 0 bits. Apple's software renderer
+// does not give the same floats for the same draw while the draw is new to
+// it: for a few hundred milliseconds after it first meets a draw's sizes and
+// formats (in any process: what it learns outlives the process), one
+// instance's frames 1, 2 and 3, with nothing changed between them, differ by
+// up to 7 ULP; two fresh instances back to back differ the same way; new
+// parameter values at known sizes move nothing (AGENTS.md, "The software
+// renderer moves"; `--settle-probe` reproduces it). So there, what --state
+// compares are two evaluations of the same shader on the same inputs by two
+// of the renderer's code versions, each held to GLSL 4.10's precision: each
+// within one evaluation's bound B of the exact value, so within 2B of each
+// other. B is --closed's (the sRGB pair, kPowBound, and the gather's two
+// n-term sums) plus an allowance of 64 roundings for what --closed leaves
+// out: the weave's cBox and cAp, each a product of two openOver ratios of
+// about 14.5 roundings, amplified about 1.4 by their cancellation at these
+// sizes (about 45), and the bilinear's three mixes (9). Assumed, and measured:
+// both versions put every texel and the spill's centre in the same place -- a
+// one-ULP shift there would show at the cards' edges as differences of order
+// 1e-4; the worst ever measured is 2.4e-7. The tolerance is three times 2B.
+// SMTEST_STATE_WIDEN=N adds N to every width, to run the scenario at sizes
+// the renderer has not met.
 //---------------------------------------------------------------------------
+double renderPairBound( double radiusPx )
+{
+	return 2.0 * ( kPowBound + 0.44 * ( 2.0 * gathered( radiusPx ) + 64.0 ) * kFloatUlp );
+}
+
+struct Compared
+{
+	size_t floats = 0;
+	double worst  = 0.0;
+	double tol    = 0.0;///< 0 on the GPU: bits
+	bool same() const
+	{
+		return tol == 0.0 ? floats == 0 : within( worst, tol );
+	}
+	std::string text() const
+	{
+		return tol == 0.0 ? fmt( "%.0f floats differ; tolerance 0 bits", static_cast< double >( floats ) )
+		                  : fmt( "%.0f floats differ, worst %.3g; tolerance %.3g on the software renderer, three times two evaluations' bound", static_cast< double >( floats ),
+		                         worst, tol );
+	}
+};
+
+Compared compareRenders( const ImageF& a, const ImageF& b, double radiusPx )
+{
+	Compared c;
+	c.tol = softwareRenderer() ? 3.0 * renderPairBound( radiusPx ) : 0.0;
+	if( a.size() != b.size() )
+	{
+		c.floats = std::max( a.size(), b.size() );
+		c.worst  = std::numeric_limits< double >::quiet_NaN();
+		return c;
+	}
+	for( size_t i = 0; i < a.size(); ++i )
+		if( a[ i ] != b[ i ] )
+		{
+			++c.floats;
+			c.worst = worse( c.worst, std::fabs( static_cast< double >( a[ i ] ) - b[ i ] ) );
+		}
+	return c;
+}
+
 void statelessCheck( int fault )
 {
 	struct Step
 	{
 		int outW, outH, destW, destH, srcW, srcH;
 	};
-	const Step steps[] = { { 640, 360, 640, 360, 640, 360 }, { 320, 180, 400, 240, 320, 180 }, { 1280, 720, 1280, 720, 960, 540 } };
+	Step steps[] = { { 640, 360, 640, 360, 640, 360 }, { 320, 180, 400, 240, 320, 180 }, { 1280, 720, 1280, 720, 960, 540 } };
+	if( const char* widen = std::getenv( "SMTEST_STATE_WIDEN" ) )
+		for( Step& st : steps )
+		{
+			const int n = std::atoi( widen );
+			st.outW += n, st.destW += n, st.srcW += n;
+		}
 	MixRig rig;
 	const Step& s0 = steps[ 0 ];
 	if( !rig.Init( s0.outW, s0.outH, InputSpec::Exact( s0.destW, s0.destH ), InputSpec::Exact( s0.srcW, s0.srcH ), true, fault ) )
@@ -1260,19 +1331,23 @@ void statelessCheck( int fault )
 	rig.UploadDest( stageCard( s0.destW, s0.destH ) );
 	rig.UploadSrc( projectionCard( s0.srcW, s0.srcH ) );
 	rig.Render();
-	const ImageF first = rig.PixelsF();
+	const ImageF first  = rig.PixelsF();
+	const double radius = rig.plugin.SetupForTest().radiusPx;
 	rig.Render();
-	const size_t again = differingFloats( first, rig.PixelsF() );
-	size_t clocks      = 0;
+	const Compared again = compareRenders( first, rig.PixelsF(), radius );
+	Compared clocks;
 	for( const double t : { 0.0, 1.0, 499000.0 } )
 	{
 		rig.plugin.SetTime( t );
 		rig.Render();
-		clocks += differingFloats( first, rig.PixelsF() );
+		const Compared c = compareRenders( first, rig.PixelsF(), radius );
+		clocks.floats += c.floats;
+		clocks.worst = worse( clocks.worst, c.worst );
+		clocks.tol   = c.tol;
 	}
 	rig.plugin.SetTime( 0.0 );
-	Check( again == 0, fmt( "a second frame is the first's floats (%.0f differ)", again ) );
-	Check( clocks == 0, fmt( "the host's clock, SetTime( 0 ), ( 1 ) and ( 499000 ), changes %.0f floats: nothing moves with time", clocks ) );
+	Check( again.same(), "a second frame is the first's floats (" + again.text() + ")" );
+	Check( clocks.same(), "the host's clock, SetTime( 0 ), ( 1 ) and ( 499000 ): nothing moves with time (" + clocks.text() + ")" );
 	bool firstStep = true;
 	for( const Step& s : steps )
 	{
@@ -1291,9 +1366,9 @@ void statelessCheck( int fault )
 		fresh.UploadDest( stageCard( s.destW, s.destH ) );
 		fresh.UploadSrc( projectionCard( s.srcW, s.srcH ) );
 		fresh.Render();
-		const size_t differ = differingFloats( running, fresh.PixelsF() );
-		Check( differ == 0, std::string( firstStep ? "" : "after a resize mid-run, " ) + fmt( "out %.0fx%.0f, Dest %.0fx%.0f", s.outW, s.outH, s.destW, s.destH )
-		                        + fmt( ", Src %.0fx%.0f: a fresh instance's floats (%.0f differ)", s.srcW, s.srcH, differ ) );
+		const Compared c = compareRenders( running, fresh.PixelsF(), fresh.plugin.SetupForTest().radiusPx );
+		Check( c.same(), std::string( firstStep ? "" : "after a resize mid-run, " ) + fmt( "out %.0fx%.0f, Dest %.0fx%.0f", s.outW, s.outH, s.destW, s.destH )
+		                     + fmt( ", Src %.0fx%.0f: a fresh instance's floats (", s.srcW, s.srcH ) + c.text() + ")" );
 		firstStep = false;
 	}
 }
@@ -1307,6 +1382,55 @@ int runState()
 	const int clock = failuresOf( [] { statelessCheck( kFaultClock ); } );
 	Negative( clock > 0, fmt( "a weave that breathes with the host's clock fails %.0f assertion(s)", clock ) );
 	return failures == 0 ? 0 : 1;
+}
+
+//---------------------------------------------------------------------------
+// --settle-probe: the renderer moving under one unchanged instance. Fresh
+// instances at output sizes it has (probably) not met, Dest 400x240 and Src
+// 320x180 resized: frames 1 and 2 back to back, frames 3 and 4 each 300 ms
+// later. A diagnostic, not a check: it never fails.
+//---------------------------------------------------------------------------
+int runSettleProbe( int instances )
+{
+	const char* baseText = std::getenv( "SMTEST_SETTLE_BASE" );
+	const int base       = baseText ? std::atoi( baseText ) : 502;
+	std::printf( "%d fresh instances, out %d..%d x 180 (SMTEST_SETTLE_BASE), Dest 400x240, Src 320x180, nothing changed between frames\n\n", instances, base,
+	             base + 2 * ( instances - 1 ) );
+	size_t moved = 0, settled = 0, worstUlp = 0;
+	for( int it = 0; it < instances; ++it )
+	{
+		const int w = base + 2 * it, h = 180;
+		MixRig rig;
+		if( !rig.Init( w, h, InputSpec::Exact( 400, 240 ), InputSpec::Exact( 320, 180 ), true, kFaultNone ) )
+			return 1;
+		rig.UploadDest( stageCard( 400, 240 ) );
+		rig.UploadSrc( projectionCard( 320, 180 ) );
+		ImageF frame[ 4 ];
+		for( int f = 0; f < 4; ++f )
+		{
+			if( f >= 2 )
+				std::this_thread::sleep_for( std::chrono::milliseconds( 300 ) );
+			rig.Render();
+			frame[ f ] = rig.PixelsF();
+		}
+		size_t differ13 = 0, ulp = 0;
+		for( size_t i = 0; i < frame[ 0 ].size(); ++i )
+			if( frame[ 0 ][ i ] != frame[ 2 ][ i ] )
+			{
+				++differ13;
+				int32_t a, b;
+				std::memcpy( &a, &frame[ 0 ][ i ], 4 );
+				std::memcpy( &b, &frame[ 2 ][ i ], 4 );
+				ulp = std::max( ulp, static_cast< size_t >( std::llabs( static_cast< long long >( a ) - b ) ) );
+			}
+		const size_t differ12 = differingFloats( frame[ 0 ], frame[ 1 ] ), differ34 = differingFloats( frame[ 2 ], frame[ 3 ] );
+		moved += differ13 > 0 || differ12 > 0;
+		settled += differ34 == 0;
+		worstUlp = std::max( worstUlp, ulp );
+		std::printf( "  out %dx%d: frame 1 vs 2 %zu floats, 1 vs 3 %zu (max %zu ULP), 3 vs 4 %zu\n", w, h, differ12, differ13, ulp, differ34 );
+	}
+	std::printf( "\n%zu of %d instances moved between frames 1 and 3 (worst %zu ULP); frames 3 and 4 agreed in %zu\n", moved, instances, worstUlp, settled );
+	return 0;
 }
 
 //---------------------------------------------------------------------------
@@ -1805,6 +1929,8 @@ void usage()
 		"  --list            every parameter, its kind, default and range\n"
 		"  --names --mixer --closed --unlit --superpose --spill --moire --alpha --state --mutation\n"
 		"                    the checks (see the top of tools/smtest/main.cpp)\n"
+		"  --settle-probe    a diagnostic: does the renderer move under one unchanged instance at\n"
+		"                    sizes it has not met (--frames N instances; SMTEST_SETTLE_BASE width)\n"
 		"  --bench           ms/frame at 720p and 1080p (--frames N, default 30)\n"
 		"  --pipe            raw RGBA Dest frames on stdin, raw RGBA frames on stdout\n"
 		"  --pipe-src PATH   raw RGBA Src frames for --pipe (a file or FIFO); default: --input-b, held\n"
@@ -1836,7 +1962,7 @@ int main( int argc, char** argv )
 	bool wantList = false, wantBench = false, wantPipe = false, wantStats = false;
 	std::string scriptPath, srcPath, check;
 	std::vector< std::string > settings;
-	static const char* checks[] = { "--names", "--mixer", "--closed", "--unlit", "--superpose", "--spill", "--moire", "--alpha", "--state", "--mutation" };
+	static const char* checks[] = { "--names", "--mixer", "--closed", "--unlit", "--superpose", "--spill", "--moire", "--alpha", "--state", "--mutation", "--settle-probe" };
 
 	for( int i = 1; i < argc; ++i )
 	{
@@ -1941,6 +2067,8 @@ int main( int argc, char** argv )
 		result = runState();
 	else if( check == "--mutation" )
 		result = runMutation();
+	else if( check == "--settle-probe" )
+		result = runSettleProbe( frames > 0 ? frames : 12 );
 	else if( wantBench )
 		result = runBench( frames > 0 ? frames : 30 );
 	else if( wantPipe )

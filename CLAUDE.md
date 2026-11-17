@@ -60,7 +60,10 @@ its "As built" section says where the code departs from it.
 - **The checks** (GL, each at 1280×720 and 320×180, each with negative controls): `--mixer`,
   `--closed`, `--unlit`, `--superpose`, `--spill`, `--moire`, `--alpha`, `--state`,
   `--mutation`; `--names` needs no GL. `SMTEST_RENDERER=software` runs any of them on Apple's
-  software renderer.
+  software renderer, which gives different floats (a few ULP) for a draw whose sizes it has not
+  met, for a few hundred ms: `--state` compares within a derived 5.39e-5 there, 0 bits on the
+  GPU (AGENTS.md, "The software renderer moves"). `SMTEST_STATE_WIDEN=N` runs `--state` at new
+  sizes; `--settle-probe` shows the renderer moving.
 - The checks can fail: `tools/mutate.sh` (39 one-character mutants, arm64, a 300 s perl alarm
   each; about a minute).
 - No dead controls: `python3 tools/sweep.py` (`--bare` drops the contexts).

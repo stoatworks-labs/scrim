@@ -186,9 +186,11 @@ done
 #---------------------------------------------------------------------------
 step "software renderer (both rasters)"
 #---------------------------------------------------------------------------
-# All of them, on Apple's software renderer. It is not bit-identical under
-# load, so no check here compares a run against another run's bits except
-# within one process.
+# All of them, on Apple's software renderer. It is not bit-identical for a
+# draw it is new to: for a few hundred ms after it first meets a draw's sizes
+# and formats, one unchanged instance's frames differ by a few ULP (AGENTS.md,
+# "The software renderer moves"). --state compares within a derived bound
+# there for that (0 bits on the GPU); no check compares bits across processes.
 for check in $CHECKS; do
 	[ "$check" = names ] && continue
 	status=0

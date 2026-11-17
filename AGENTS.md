@@ -112,7 +112,7 @@ Both rasters, 1280×720 and 320×180 (where they differ, the 1280 figure first).
 | `--alpha` | white under every transparent texel changes nothing, Src and Dest, at the output's size and resized | 0 floats | 0 bits |
 | | out.a is 1; white on ~160 opaque Src texels shows | every pixel | exact |
 | | half alpha is half the light, Src and Dest | worst 4.6e-8 | 3 × 1.5 × kLinearBound = 6.1e-5 |
-| `--state` | two frames; SetTime(0), (1), (499000); a resize mid-run (to 320×180 with Dest 400×240, then 1280×720 with Src 960×540); each against a fresh instance | 0 floats differ | 0 bits, one context |
+| `--state` | two frames; SetTime(0), (1), (499000); a resize mid-run (to 320×180 with Dest 400×240, then 1280×720 with Src 960×540); each against a fresh instance | GPU: 0 floats differ. Software renderer: 0 at sizes it knows; at sizes it has not met (`SMTEST_STATE_WIDEN` 90, 94, 98, 102), up to 307 floats, worst 2.38e-7 | GPU: 0 bits, one context. Software renderer: 5.39e-5, three times two evaluations' bound (below, "The software renderer moves") |
 | `--mutation` | `cBox * stage` → `cBox + stage` in the shipped text, through the shader hook, fails `--closed`; the shipped text through the hook renders the default path's floats | 2 assertions fail; 0 differ | exact |
 | clips alpha | BattleWeapon_Tank_09 and Ethnik2, each as Src (over grey) and as Dest (under grey), at the defaults: white under every transparent pixel | 0 output bytes change; alpha 255 | 0 |
 | clips defaults | Front Light and Back Light = 1 / the median clip's p99 brightest channel at light 1 | 12.2668 vs 12.2665; 8.0270 vs 8.0279 (`--list`'s four decimals) | 1.78e-3, 1.32e-3 (`--list`'s and the source's four decimals, the histogram bin) |
@@ -126,10 +126,11 @@ negative controls and the mutants are each far larger than that.
 - Positions come from `floor(gl_FragCoord.xy)`, inputs from `texelFetch` at integer texels.
   No varying is interpolated and no texture filter is used (except under
   `kFaultHardwareBilinear`, the negative control).
-- The bit claims (`--unlit`, the paint in `--alpha`, `--state`) rest on IEEE 754 products with
-  an exact 0 or 1 and sums with an exact 0, and on a single context; never on two roundings
-  agreeing across contexts. The software renderer is not bit-identical under load, so no
-  check compares runs across processes.
+- The bit claims (`--unlit`, the paint in `--alpha`, `--state` on the GPU) rest on IEEE 754
+  products with an exact 0 or 1 and sums with an exact 0, and on a single context; never on
+  two roundings agreeing across contexts, and no check compares runs across processes. On
+  the software renderer they also rest on its drawing both renders with the same code, which
+  it does not always do: see "The software renderer moves", next.
 - `--unlit`'s unit gain is exact by construction: Open Area 0.75 (1 − φ = 0.25), Front Light 4
   (host 0.5, squared and × 16 exactly), Thread 1, Opacity 1. Front Light 2 would not be: its
   host value √(1/8) is not a float.
@@ -141,6 +142,72 @@ negative controls and the mutants are each far larger than that.
   and on Apple's software renderer (`SMTEST_RENDERER=software`). On the software renderer the ramp check in `--mixer` cannot see
   `kFaultHardwareBilinear`, because that renderer filters with float weights; the control is
   still caught there by the padding it reads. llvmpipe, other GPUs, Windows: not run.
+
+## The software renderer moves
+
+Found when `--state` failed once on the software renderer in an independent full verify on
+2026-11-17 (237 floats differed between the running instance after its resize to 320×180 and
+a fresh one) while bubble's verify, carousel's build and snowglobe's start were running; it
+passed five times alone afterwards. Measured since, on this Mac (M4 Max, macOS 26.4.1):
+
+| what was rendered | software renderer | GPU |
+| --- | --- | --- |
+| one fresh instance, sizes it has not met, nothing changed between frames: frame 1 against frame 3 | moved in 11 of 12, 12 of 12 and 8 of 8 instances; up to 655 floats, worst 7 ULP (2.38e-7) | 0 of 12, 0 of 12, 0 of 8 |
+| the same, frame 1 against frame 2, back to back | moved | — |
+| the same, frame 3 against frame 4, each after 300 ms | 0 of 64 moved | 0 of 32 |
+| the same sizes again, in a new process | 0 of 12, 0 of 12, 0 of 8 moved | 0 of 12 |
+| a known size, Back Light and Front Light set to values never used, frames 1–3 | 0 of 10 moved | — |
+| two fresh instances back to back at `--state`'s 320×180 step | 47 floats differ, 2 ULP (once in many: when the sizes were new to it) | — |
+| `--state` as it was, every width widened by 6, 10, 14, 18 (`SMTEST_STATE_WIDEN`) | failed 4 of 4 (28–43 floats at the 1280×720 step) | — |
+| sizes it knows, under load: 20 busy loops at load average 76, 30 runs of the 320×180 step; then 8 such probes at once, 200 runs, load 24–36 | 0 moved | — |
+
+So it is not load: the renderer gives different floats for the same draw for a few hundred
+milliseconds after it first meets the draw's sizes and formats, and what it learns outlives the
+process. Load and other processes only decide when a size it once knew is new to it again
+(another session's software-renderer runs evicting it is the likely reading of the original
+failure; not proven). The plugin keeps no texture, framebuffer or size between frames
+(`source/Scrim.cpp`; `firstWidth` is read only under `kFaultStaleSize`), every fetch is clamped
+into the used area, and two fresh instances differ by the same few ULP. It is not plugin state.
+The differences line up in columns (x = 27, 141, 159 …), as an x-only term of the weave or the
+bilinear would if two code versions round it differently. `smtest --settle-probe` reproduces the
+first table row (`SMTEST_SETTLE_BASE` picks the widths).
+
+**The check, as fixed.** On the GPU every `--state` comparison stays 0 bits. On the software
+renderer each is two evaluations of the same shader on the same inputs by two code versions,
+each within one evaluation's bound B of the exact value, so the two are within 2B:
+
+- B = kPowBound + 0.44 · (2n + 64) · 2⁻²⁴: `--closed`'s bound (the sRGB pair, which already
+  counts the light sum's sixteen roundings, and the gather's two n-term sums, n = 25 here) plus
+  an allowance of 64 roundings for what `--closed` leaves out. Counted: an `openOver` ratio is
+  about 14.5 roundings (t₀ and t₁ three each, the two `openTo`s two each, the difference and the
+  span one each, the division 2.5), amplified by its cancellation about (1 + f)/f ≈ 1.4 at
+  `--state`'s sizes (f ≈ 2.7–12 weave cycles a pixel across): about 22; cBox and cAp are each a product
+  of two, about 45; the bilinear's three `mix`es, 9. The encode turns a relative error e into at
+  most 0.44 e absolute, as in kPowBound's derivation.
+- **Assumed, with evidence:** both versions put every texel and the spill's centre in the same
+  place. GLSL lets a division be 2.5 ULP off, and a texel position one ULP off would show at the
+  cards' sharp edges as a difference of order 1e-4; the worst measured is 2.4e-7. Not proven
+  covered: a `mix` computed as x + a(y − x) is good only to roundings of the brighter texel, so a
+  dark output beside a bright texel could exceed its share of the allowance.
+- The tolerance is 3 × 2B = **5.39e-5**. At new sizes the check measures up to 307 floats, worst
+  2.38e-7 (four runs), 1/226 of it. The stale-width fault lands at 0.0213 and 0.0443, the clock
+  fault at 0.0375 and 0.764: 395× the tolerance at the least. A state bug smaller than 5.4e-5
+  would pass on the software renderer; the GPU run, at 0 bits, would catch it.
+
+**Tried first, and wrong: a witness.** One more instance per step rendered before and after
+each attempt, and an attempt discarded if any witness moved. Twelve runs at new sizes passed,
+each discarding one or two attempts; the thirteenth had still witnesses and failed (306 and 17
+floats).
+The likely reading (not proven): a new instance's program goes through its own unsettled
+frames whatever an older instance at the same sizes does, so a still witness says nothing
+about the instances under test.
+
+**Exposed in principle, not changed:** the other 0-bit comparisons of two renders on the
+software renderer: `--unlit`'s dark backstage and wash, `--alpha`'s white under transparent
+texels, `--mutation`'s shipped text through the hook. `--unlit` and `--alpha` passed at two
+rasters the renderer had not met (338×190 and 346×194); `--mutation` (fixed at 320×180) was not
+run at a new size. If one of them fails on the software renderer alone by a few ULP, it is this,
+and `compareRenders` in `tools/smtest/main.cpp` is the fix.
 
 ## The negative controls and the mutants
 
@@ -242,6 +309,9 @@ pixel. Never measured inside Resolume; 4K not run.
 - **Apple's GPU filters with 8-bit weights**; its software renderer with float weights.
 - `--list` prints four decimals of the host's 0..1, which through 16 p² moves Front Light's
   default by up to 1.4e-3: clips.py's tolerance carries it.
+- **The software renderer moves under a new draw** (above): `--state` passed on every run here,
+  then failed once on a busy machine. The witness fix passed twelve runs at new sizes and failed
+  the thirteenth.
 - **Frames queued back to back time nothing.** The bench first ran 60 frames with glFinish
   only at the ends: 0.04 ms/frame at 720p, 0.09 at 1080p, and 1080p queued came out faster
   than 720p. Timed alone, the biggest disc at 1080p takes 2.3 ms on GL_TIME_ELAPSED and the
@@ -294,6 +364,8 @@ pixel. Never measured inside Resolume; 4K not run.
 - The blur is measured from the edge's slope at its half-light point, not its second moment.
 - `--mixer` also measures the hand bilinear on a float ramp; `--state` also has the
   stale-size and clock faults; the plugin declares no clock.
+- `--state` on the software renderer compares within 5.39e-5 (two evaluations' bound, ×3), not
+  0 bits: the renderer's floats for a draw it has not met move by up to 7 ULP.
 - `--bench` runs 720p and 1080p only (no 4K loops on a shared Mac).
 - The sRGB budget is 6e-6, not penumbra's 4e-6: two decoded factors per term here, one there.
 - Defaults as measured: Front Light 12.2665, Back Light 8.0279.
