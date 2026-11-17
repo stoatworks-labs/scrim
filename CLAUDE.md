@@ -40,15 +40,16 @@ its "As built" section says where the code departs from it.
 - Cue sheets for `--pipe`: `--script cues`, `frame Name value` per line; standard and colour
   parameters ramp between keys, booleans step; a bad line exits 2.
 - Render cost: `./build/smtest --bench` (720p and 1080p, at the defaults and at the biggest
-  disc the controls allow).
+  disc the controls allow; each frame timed alone, GL_TIME_ELAPSED and wall clock, medians.
+  Never time frames queued back to back: on this GPU they measure nothing).
 
 ## Verify
 - Everything: `TMPDIR=<a writable dir> OXBOW=/path/to/oxbow tools/verify.sh [BUILD_DIR]`
   (source greps, both shaders through `glslc`, a fresh universal build in `build-verify` with
   no warnings outside the SDK, every check on the GPU and again on Apple's software renderer
   at both rasters, the pipe, the bundle, `oxbow probe` and `selftest`, 39 mutants, the sweep,
-  Arena's clips, the bench): about twelve minutes on this Mac, most of it the software
-  renderer. It ends with one line, `verify: all N checks passed (M negative controls; logs in
+  Arena's clips, the bench): 569 s in the last full run on this Mac (M4 Max, load average
+  15–22). It ends with one line, `verify: all N checks passed (M negative controls; logs in
   …)`, or the failures.
 - **Set `TMPDIR`** to a writable scratch directory in a sandboxed Claude session, or the
   heredocs hang.

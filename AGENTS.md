@@ -138,8 +138,7 @@ negative controls and the mutants are each far larger than that.
 - No `sin`, `atan` or `asin` in any shader (Apple's software renderer gets two of them
   wrong: nipkow).
 - Every check passes at 1280×720 and 320×180 on this Mac's GPU (GL "4.1 Metal - 90.5", as oxbow reports it)
-  and on Apple's software renderer (`SMTEST_RENDERER=software`, about eight minutes for all
-  of them). On the software renderer the ramp check in `--mixer` cannot see
+  and on Apple's software renderer (`SMTEST_RENDERER=software`). On the software renderer the ramp check in `--mixer` cannot see
   `kFaultHardwareBilinear`, because that renderer filters with float weights; the control is
   still caught there by the padding it reads. llvmpipe, other GPUs, Windows: not run.
 
@@ -202,6 +201,26 @@ restates a default. Checked by hand (identical PNGs): with Draw Mesh off, Mesh a
 are dead; with Spill Distance 0, Audience is dead; with Front Light 0, Spill Distance, Pixel
 Fill and Audience are dead. Those are the dependencies.
 
+## Render cost
+
+`smtest --bench`, this Mac (Apple M4 Max, GL "4.1 Metal - 90.5"), Dest and Src at the output
+size, each frame timed alone after a 60-frame warm-up; medians of 60 frames, ms/frame. `gpu`
+is GL_TIME_ELAPSED around the frame, `wall` is Render to glFinish. From verify's run
+(2026-11-17, load average 21.8):
+
+| resolution | defaults gpu | defaults wall | biggest disc gpu | biggest disc wall |
+| --- | --- | --- | --- | --- |
+| 1280×720 | 0.496 | 0.703 | 0.564 | 0.783 |
+| 1920×1080 | 0.197 | 0.384 | 2.308 | 2.507 |
+
+The light frames are noisy on a shared GPU: over eight more runs, 720p at the defaults read
+0.071–0.089 ms on the GPU's clock in six and 0.50 in two (each the first figure of its run),
+and 1080p at the defaults 0.196–0.362. A half-second warm-up did not remove the 0.50s, so it is
+not the idle clock; other sessions' GL harnesses were running at the time, which is the likely
+cause (not proven). The biggest disc (a 2 m gauze, Spill 3, Audience 16: a 5.4 px radius at 1920
+wide, well under the 16 px cap) is steady at 0.55 ms (720p) and 2.29–2.54 ms (1080p). The defaults' disc is under a
+pixel. Never measured inside Resolume; 4K not run.
+
 ## Traps hit building this
 
 - **`fmt()` takes doubles only** (penumbra's trap): a `%s` slipped into the `--state` message
@@ -223,6 +242,16 @@ Fill and Audience are dead. Those are the dependencies.
 - **Apple's GPU filters with 8-bit weights**; its software renderer with float weights.
 - `--list` prints four decimals of the host's 0..1, which through 16 p² moves Front Light's
   default by up to 1.4e-3: clips.py's tolerance carries it.
+- **Frames queued back to back time nothing.** The bench first ran 60 frames with glFinish
+  only at the ends: 0.04 ms/frame at 720p, 0.09 at 1080p, and 1080p queued came out faster
+  than 720p. Timed alone, the biggest disc at 1080p takes 2.3 ms on GL_TIME_ELAPSED and the
+  queued run 0.03 ms/frame. Probably the tile renderer's hidden-surface removal shading only
+  the last of a run of opaque full-screen draws into one framebuffer (not proven). Each
+  frame is now timed alone, and the bench fails if a frame did not render or the output is
+  blank.
+- **A boolean that changes no byte at 64×36.** The pipe's cue test stepped Draw Mesh; at
+  64×36 a 9.5 m gauze puts about 59 weave cells in a pixel, so the weave per pixel and its
+  average are the same bytes and the step never showed. It steps Linear Light.
 
 ## Open questions for Allan
 

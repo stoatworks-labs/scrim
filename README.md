@@ -77,7 +77,9 @@ cmake --build build -j8
 ```
 
 `cmake --install build` copies `Scrim.bundle` into Arena's Extra Effects. Not done on this
-machine. Full verification: `TMPDIR=<scratch> OXBOW=<a built oxbow> tools/verify.sh`. See
+machine. `./build/smtest --bench` times it: on an M4 Max, about 0.2 ms a frame at 1080p at
+the defaults on the GPU's clock, 2.3 ms with the biggest defocus disc the controls allow
+(noisy on a shared GPU; see AGENTS.md). Full verification: `TMPDIR=<scratch> OXBOW=<a built oxbow> tools/verify.sh`. See
 [AGENTS.md](AGENTS.md) for every check, its tolerance and where the tolerance comes from.
 
 ## What it leaves out

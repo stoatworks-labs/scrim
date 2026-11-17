@@ -19,7 +19,7 @@
 #   software      the same checks, both rasters, on Apple's software
 #                 renderer, which is what a GPU-less machine gets: a check
 #                 calibrated on this Mac's GPU fails here before it fails
-#                 anywhere else. About ten minutes.
+#                 anywhere else.
 #   pipe          the filming mode: N frames in, N out, two inputs; a
 #                 standard parameter ramps and a boolean steps; bad cues
 #                 and bad --set values refused; a closed stdout is exit 1
