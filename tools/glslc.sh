@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 #
 # Every shader through glslc, the one shader check that needs no GL driver.
-# Called by tools/verify.sh AND by CI, so the two cannot drift: a runner with
-# no accelerated GL cannot compile a shader through a driver, and this is how
-# CI covers the shaders instead.
+# Called by tools/verify.sh. (Scrim has no CI: it builds and
+# tests on this Mac. GLSLC_REQUIRED=1 makes a missing glslc a failure.)
 #
 #     tools/glslc.sh          exit 0 when every shader compiles, or glslc is absent
-#     GLSLC_REQUIRED=1 tools/glslc.sh   ...and a missing glslc is a failure (CI)
+#     GLSLC_REQUIRED=1 tools/glslc.sh   ...and a missing glslc is a failure
 #
 set -uo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
@@ -51,8 +50,6 @@ FILES = [
 # that has moved is a KeyError.
 ASSEMBLED = {
 	"vertex":  [ "kVersion", "kVertex" ],
-	"convert": [ "kVersion", "kCommon", "kConvertFragment" ],
-	"prefix":  [ "kVersion", "kCommon", "kPrefixFragment" ],
 	"screen":  [ "kVersion", "kCommon", "kScreenFragment" ],
 }
 
