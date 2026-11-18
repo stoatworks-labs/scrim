@@ -97,7 +97,13 @@ its "As built" section says where the code departs from it.
 
 ## Not done yet
 - Never loaded in Resolume (either platform); never built on Windows.
-- No user guide, no OpenFX port, no browser demo, no presets.
+- No user guide, no OpenFX port, no presets.
+- Browser demo: `demo/` is <https://scrim-demo.stoatworks-labs.com>, redeployed by
+  `deploy.yml` on a push to main (a route over a proxied AAAA 100:: record: `wrangler.toml`).
+  After a shader edit run `python3 demo/tools/check_shaders.py --write`; after a change to
+  Controls, Model or ProcessOpenGL change `demo/port.js` too (verify.sh fails until the
+  hashes in check_shaders.py's PORTED_FROM are renewed; `--hashes` prints them). Crosscheck
+  by hand: AGENTS.md, "Browser demo".
 
 ## Diagnostics
 

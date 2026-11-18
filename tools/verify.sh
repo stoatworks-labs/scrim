@@ -11,7 +11,10 @@
 #                 compile through a real GLSL compiler (tools/glslc.sh),
 #                 before a host has to find out. glslc is REQUIRED here: a
 #                 skipped compile is not a pass.
-#   build         a fresh universal Release build, which is what would ship;
+#   browser demo  is demo/shaders.js still source/Shaders.cpp to the
+#                 character, and is the C++ the page's port came from
+#                 unchanged (demo/tools/check_shaders.py)
+#   build        a fresh universal Release build, which is what would ship;
 #                 no warning in this repo's own code
 #   checks        the plugin's claims, measured at TWO rasters (1280x720 and
 #                 320x180), each with negative controls built into the real
@@ -103,8 +106,7 @@ else
 	fail "a GLSL reserved word is declared as an identifier, or M_PI is used"
 fi
 # Built-ins that arrived in GLSL 4.00 / ES 3.10: they compile everywhere here
-# but not in WebGL2, where the fleet's browser demos run the shaders unedited.
-# Scrim has no demo; the rule is kept so one can be made.
+# but not in WebGL2, where the browser demo (demo/) runs the shaders unedited.
 if command grep -nE '(^|[^A-Za-z_])(findMSB|findLSB|bitCount|bitfieldExtract|bitfieldInsert|bitfieldReverse|uaddCarry|usubBorrow|umulExtended|imulExtended|frexp|ldexp|fma|textureGather|textureQueryLevels|packUnorm4x8|unpackUnorm4x8)[[:space:]]*\(' source/Shaders.cpp | command grep -vE '^[0-9]+:[[:space:]]*//' >"$LOGS/webgl.txt"; then
 	sed 's/^/   /' "$LOGS/webgl.txt"
 	fail "a built-in GLSL ES 3.00 lacks is in the GLSL"
@@ -125,6 +127,24 @@ if GLSLC_REQUIRED=1 tools/glslc.sh; then
 	pass "every shader compiles through glslc"
 else
 	fail "a shader does not compile, or glslc is missing (brew install shaderc)"
+fi
+
+#---------------------------------------------------------------------------
+# The page runs the plugin's shaders: a shader edited here and not spliced
+# across would leave it drawing something else and saying it is the plugin.
+# The check also holds the page's assembly of them, and the C++ its CPU half
+# was ported from (Controls, Model's Plan, Scrim's constructor, asked() and
+# ProcessOpenGL), to the text it had when it was ported. The port itself,
+# demo/port.js, is a hand port: demo/tools/crosscheck/ compares the page's
+# frames with smtest --pipe's and its numbers with the C++'s, and needs
+# Chrome, a GPU and node, so it is run by hand (AGENTS.md).
+#---------------------------------------------------------------------------
+step "browser demo"
+if python3 demo/tools/check_shaders.py >"$LOGS/demo.log" 2>&1; then
+	pass "demo/shaders.js is source/Shaders.cpp, and the C++ the port came from is the text it was ported from"
+else
+	sed 's/^/   /' "$LOGS/demo.log"
+	fail "the demo's shaders, or the C++ its port came from, have drifted"
 fi
 
 #---------------------------------------------------------------------------

@@ -324,6 +324,60 @@ pixel. Never measured inside Resolume; 4K not run.
   64×36 a 9.5 m gauze puts about 59 weave cells in a pixel, so the weave per pixel and its
   average are the same bytes and the step never showed. It steps Linear Light.
 
+## Browser demo (2026-11-18)
+
+`demo/` is <https://scrim-demo.stoatworks-labs.com>, built to the fleet's `resolume-demo` kit
+(`~/Projects/resolume/specs/DEMO-BRIEF.md`), in penumbra's two-input shape.
+
+- **What is the plugin's:** the GLSL. kVersion, kVertex, kCommon and kScreenFragment are
+  spliced unedited into `demo/shaders.js` by `demo/tools/check_shaders.py --write`, which
+  verify.sh runs: every piece character for character, the assembly on both sides, all 23
+  uniforms named in `demo/port.js` (the ints through `setInt`, the ivec2s through
+  `uniform2i`), and the SHA-256 of the C++ the port came from (Names.h, Controls.h/.cpp,
+  Model.h/.cpp whole; Scrim.h's ParamID; Scrim.cpp's constructor, asked(), ProcessOpenGL and
+  SetFloatParameter; GLState.h's unbind and bind).
+- **What is a port, in `demo/port.js`:** Controls.cpp's conversions, Model.cpp's Plan (in
+  double: a JavaScript number is a double, so the FreqHi/FreqLo split is the same operations
+  in the same precision, and only the upload rounds to float), and Scrim.cpp's constructor,
+  asked() and ProcessOpenGL. Not ported: the log and the About block; the Fault branches are
+  ported but the Fault uniform is 0, as shipped.
+- **Crosscheck** (`demo/tools/crosscheck/crosscheck.py`, by hand: Chrome, a GPU and smtest):
+  the page renders its own two clips at each frame's time, reads back both inputs as the
+  shader got them and its picture, and the same inputs go through `smtest --pipe --pipe-src`
+  with the same `--set`s (and a `--script` for the cue case). M4 Max, GL 4.1 against Chrome's
+  ANGLE on Metal: the table is `smtest --list`'s (15 controls, names, kinds, defaults); every
+  uniform set, no GL error; **19 cases, 149 frames, every pixel of every frame identical**
+  (640 × 360 and 960 × 540; both lights off in turn, Linear Light off, Wash alone, the spill
+  far and at the projector, the widest disc, a coarse mesh, Draw Mesh off, coloured threads,
+  Open Area 0 and 1, the alpha clip on both inputs, a black scene, Src at 3/4 size through
+  the hand bilinear, and a cue sheet ramping Front, Back, Thread_Blue and Spill and stepping
+  Draw Mesh). Negative controls, each caught under the pass rule (max 1 level, 99%
+  identical): one slider step (0.001) off on Back Light (77.4% identical), Front Light
+  (87.9%), Spill Distance (97.7%), Mesh (40.4%, max 10), Open Area (88.8%) and Thread red
+  (96.1%); the projection one frame late (max 173).
+- **Port numbers** (`port_numbers.py`, by hand: node): Plan's 37 fields from the plugin's own
+  Controls.cpp and Model.cpp (`/usr/bin/c++ -O3`) against port.js under node, on 4,037 cases
+  (the defaults, each control at 0 and 1, random sets at widths 1 to 16384): every int and
+  boolean equal, 99.966% of doubles equal to the bit. The other 44 are 10 cases where a pow
+  (Audience, Mesh, Gauze Width) comes out a place apart, libm against V8, and what follows
+  from it, within 3e-16; in 2, FreqLo (a remainder) rounds to the neighbouring float.
+  Negative controls: M_app's formula wrong in port.js, and an asked() line changed in
+  Scrim.cpp, both fail.
+- **Flashes on the page** (xenon's `flashcheck.py`): the default view, the Geometry card over
+  the Synthetic scene at the defaults, 960 × 540 at 60 fps for 40 s, lossless: 0 transitions
+  over the whole frame, 1 in the worst window. Each preset's view for 12 s: 0 or 1. No Start
+  gate. The page's photosensitivity note carries the release survey (2 of 33 demo-clip pairs
+  over at the defaults).
+- **Gaps, all said on the page:** the inputs are the kit's generated clips, a black layer or
+  the visitor's picture (Dest only); the clips are premultiplied and the plugin reads straight
+  alpha, so soft alpha edges come out darker; Opacity and Linear Light are sliders (Arena's
+  fader binding and hidden index 0 measured on other mixers, not on Scrim); the CPU half is
+  checked by a reader, the crosscheck and port_numbers, not by smtest; textures are unpadded,
+  so the padded path (`--mixer`) never runs; the hand bilinear runs only for a picture of the
+  visitor's at a changed Composition size; the clock is the page's and only the clips use it;
+  GLSL ES 3.00 (another GPU may round pow a level apart); the stats line and the presets are
+  the page's; no About block, log or Fault.
+
 ## Open questions for Allan
 
 1. **The defaults are bright.** By the lithophane rule the median clip fills the range at each

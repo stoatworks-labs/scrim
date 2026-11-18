@@ -93,6 +93,17 @@ onto the gauze and the threads cast no shadow on it; the audience sits on the ax
 blur of the pixel grid, two-scrim moiré and hexagonal bobbinet are not modelled. The output is
 clamped to [0, 1] and is always opaque.
 
+## Browser demo
+
+**<https://scrim-demo.stoatworks-labs.com/>** is SW Scrim in a web page: every control with
+its own name, group and default, and two of the kit's generated clips (or a black layer) as
+the projection and the scene behind, or a picture of yours (decoded in the page, never
+uploaded) as the scene. The shader is the plugin's own GLSL, spliced unedited
+(`demo/tools/check_shaders.py`, run by `tools/verify.sh`). What feeds it (the conversions,
+`Plan`, every uniform) is a JavaScript port, and `demo/tools/crosscheck/` pipes the page's
+own two inputs through `smtest --pipe` frame for frame: in 19 cases, 149 frames, every pixel
+is the plugin's. It is a demo, not the plugin, and says on the page what it leaves out.
+
 ## Status
 
 Public at `stoatworks-labs/scrim` since 2026-11-18, released at v0.1.0; never loaded into
