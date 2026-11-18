@@ -34,6 +34,38 @@ dark the gauze is a screen; light the back and darken the front and it all but d
 between you see both. The projection's own light carries on through the holes and lands on
 the set behind, bigger, dimmer and out of focus, and lights it.
 
+<!-- downloads:start -->
+
+## Download
+
+**[v0.1.0](https://github.com/stoatworks-labs/scrim/releases/tag/v0.1.0)** — prebuilt for macOS and Windows. Pick your platform:
+
+<details>
+<summary><b>macOS</b> — Universal (Apple Silicon + Intel)</summary>
+
+| Build | Download | Size |
+| --- | --- | --- |
+| Universal (Apple Silicon + Intel) · .dmg disk image | [`scrim-0.1.0-macos-universal.dmg`](https://github.com/stoatworks-labs/scrim/releases/download/v0.1.0/scrim-0.1.0-macos-universal.dmg) | 208 KB |
+| Universal (Apple Silicon + Intel) · .zip archive | [`scrim-macos-universal.zip`](https://github.com/stoatworks-labs/scrim/releases/latest/download/scrim-macos-universal.zip) | 171 KB |
+
+</details>
+
+<details>
+<summary><b>Windows</b> — x64</summary>
+
+| Build | Download | Size |
+| --- | --- | --- |
+| x64 · .exe installer | [`scrim-0.1.0-windows-x86_64-setup.exe`](https://github.com/stoatworks-labs/scrim/releases/download/v0.1.0/scrim-0.1.0-windows-x86_64-setup.exe) | 242 KB |
+| x64 · .zip archive | [`scrim-windows-x86_64.zip`](https://github.com/stoatworks-labs/scrim/releases/latest/download/scrim-windows-x86_64.zip) | 115 KB |
+
+</details>
+
+All builds, checksums and release notes: [github.com/stoatworks-labs/scrim/releases](https://github.com/stoatworks-labs/scrim/releases).
+
+macOS builds are signed and notarised and open normally. The Windows builds are unsigned, so SmartScreen warns once.
+
+<!-- downloads:end -->
+
 ## The one idea
 
 **What the audience sees at a point of the gauze is the light its threads reflect plus the
