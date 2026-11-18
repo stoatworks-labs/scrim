@@ -84,8 +84,10 @@ its "As built" section says where the code departs from it.
 - **macOS make compares whole-second mtimes**: mutate.sh deletes the touched objects and the
   binary before every build; never hand-mutate a source file in a shared build directory.
 - `smtest`'s `fmt()` takes doubles only: never pass it a `%s` or `%d` format.
-- **Provisional hand copies:** `source/StoatworksAbout*.h` (guide = "", no user guide yet)
-  and `ATTRIBUTIONS.md`.
+- **Generated, never edit here:** `source/StoatworksAbout.h`, `ATTRIBUTIONS.md` (and the
+  README's attributions block), the issue forms and `.github/FUNDING.yml` come from
+  stoatworks-backend's sync scripts (registered 2026-11-18). Edit them there and re-sync.
+  The About block's User guide button makes 20 parameters; release.yml's wincheck expects 20.
 - **The workflows.** The repo is public (`stoatworks-labs/scrim`, since 2026-11-18), which
   is what allows Actions. `ci.yml` builds on macOS and Windows on every push and pull
   request; `release.yml` (penumbra's, xenon's shape, with pepper's `tools/wincheck.ps1`)

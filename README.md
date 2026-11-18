@@ -109,3 +109,7 @@ is the plugin's. It is a demo, not the plugin, and says on the page what it leav
 Public at `stoatworks-labs/scrim` since 2026-11-18, released at v0.1.0; never loaded into
 Resolume yet. MIT; see
 [LICENSE](LICENSE) and [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
+
+<!-- attributions:start -->
+This project is built on other people's work — see [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
+<!-- attributions:end -->
