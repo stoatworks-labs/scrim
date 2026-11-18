@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="project-page" content="https://stoatworks-labs.com/software/scrim/" />
     <title>SW Scrim — browser demo | Stoatworks Labs</title>
     <meta name="description" content="Try SW Scrim, an FFGL mixer for Resolume, in your browser: a theatre gauze, with this layer as what the projector sends onto it and the layer below as the scene behind it, so the front light makes it a screen and the back light makes it all but vanish, the projection's light spills through the holes onto the set, and the weave beats against the projector's pixels. The plugin's own GLSL, ported to WebGL2 unedited, run by a JavaScript port of its CPU half, on generated clips. A demo, not the plugin." />
     <link rel="icon" href="data:," />
@@ -27,8 +28,10 @@
         <strong>Scrim adds no flashes of its own: nothing in it moves with time.</strong>
         But its lights brighten both clips, about four times at the defaults, so a clip's own
         flicker can become a large flash, and stepping a light fast (Front Light, Back Light,
-        Wash or Opacity, or a preset after a preset) flashes the whole picture. Flashing light
-        can trigger seizures in people with photosensitive epilepsy.
+        Wash or Opacity, or a preset after a preset) flashes the whole picture. And with Draw
+        Mesh on, the weave beats against the pixels in a moiré, a regular pattern of fine
+        stripes; Draw Mesh off removes it. Flashing light and striped patterns can trigger
+        seizures in people with photosensitive epilepsy.
       </p>
       <p>
         At its defaults it goes over the line on 2 of 33 pairs of Resolume's demo clips:

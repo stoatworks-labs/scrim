@@ -369,14 +369,78 @@ pixel. Never measured inside Resolume; 4K not run.
   gate. The page's photosensitivity note carries the release survey (2 of 33 demo-clip pairs
   over at the defaults).
 - **Gaps, all said on the page:** the inputs are the kit's generated clips, a black layer or
-  the visitor's picture (Dest only); the clips are premultiplied and the plugin reads straight
-  alpha, so soft alpha edges come out darker; Opacity and Linear Light are sliders (Arena's
-  fader binding and hidden index 0 measured on other mixers, not on Scrim); the CPU half is
+  the visitor's picture (Dest only); the clips are premultiplied, as Arena's textures are, and
+  the plugin reads straight alpha, so soft alpha edges come out darker; Opacity and Linear
+  Light are sliders (Arena's fader binding, hidden index 0 and skipped picture at Opacity 0
+  measured on Scrim on 2026-11-18, below); the CPU half is
   checked by a reader, the crosscheck and port_numbers, not by smtest; textures are unpadded,
   so the padded path (`--mixer`) never runs; the hand bilinear runs only for a picture of the
   visitor's at a changed Composition size; the clock is the page's and only the clips use it;
   GLSL ES 3.00 (another GPU may round pow a level apart); the stats line and the presets are
   the page's; no About block, log or Fault.
+
+## What scrim showed in Arena (2026-11-18)
+
+The fleet's gate cannot gate a mixer, so it was mounted by hand over Arena's REST API and read
+through the plugin's own log and Arena's composition snapshot (`GET
+/composition/monitors/1/snapshot.jpg`), as penumbra was the same morning.
+
+**macOS: Arena 7.29.0 33052, Apple M4 Max (GL 4.1 Metal - 90.5).** A local universal build of
+6b4af8c's source (ad-hoc signed), installed for the probe and taken out after. Arena opened
+Allan's show composition (1920x1080, 7 layers), so the probe added two layers on top (8: Dest,
+Alpha blend at opacity 1 so the show is covered; 9: Src, Blend Mode SW Scrim), used only
+those, deleted them (7 layers before and after) and quit with Quit, not Save & Quit; every
+.avc's mtime was unchanged. The stills were 1920x1080 PNGs made for the probe: the harness's
+`stage` and `projection` cards rendered to PNG, flat black, grey 124, white with alpha 255
+left and 128 right, white left and black right.
+- Offered in the Blend Mode list; 18 of 19 parameters in `video.mixer` (besides Blend Mode),
+  Linear Light the missing one. The About text reads `Scrim v0.1.0 - MIT - Stoatworks Labs,
+  stoatworks-labs.com`. Thread's colour comes through REST as `Thread`, `Thread_Green`,
+  `Thread_Blue`.
+- The log: `host=Resolume Arena version=7.29.0 33052`, `first frame: Dest 1920x1080 of
+  1920x1088, Src 1920x1080 of 1920x1088, out 1920x1080` (padded: the MaxUV path `--mixer`
+  tests is the one Arena takes). Layer opacity 0.2, 0.85, 0.5, 1.0 → `Opacity 0.200000 at
+  frame 375`, `0.850000 at 490`, `0.500000 at 604`, `1.000000 at 719`; a REST write of 0.15
+  to the mixer's own Opacity read back 1.0 and logged nothing.
+- **Arena draws what smtest draws.** On the stage and projection stills at the defaults, the
+  snapshot matched `smtest --pipe` on the same two PNGs, over the middle 3/5 of the frame, to
+  a mean of 1.07 levels (99th percentile 14, at the weave's texture under JPEG). Two snapshots
+  a moment apart read exactly 0.0: no state, no clock. `docs/arena.jpg` is that snapshot.
+- **Premultiplied.** Dest black, Src white with alpha 1 on the left and 0.5 on the right, Draw
+  Mesh off, Front Light 0.378 (2.29): smtest predicts left 231, right 170 if Arena hands
+  straight colour, 83 if premultiplied, 231 if it drops the alpha. Arena: **231 / 83**. The
+  control, the same still under Arena's own Alpha blend over black, read 255 / 128. So Arena
+  hands a mixer premultiplied textures, and Scrim, which reads straight, gives a white texel
+  at half alpha decode(0.5)·0.5 = 0.108 of its light instead of 0.5. Opaque texels are exact;
+  transparent ones give 0 either way.
+- **Opacity 0.** Dest grey 124 (linear 0.2), Src white left and black right, Draw Mesh off,
+  Front Light 0.2673 (1.14), Back Light 0.4834 (3.74): smtest predicts left 235/206/178/171/170
+  and right 170 at Opacity 1/0.5/0.1/0.01/0. Arena: 235/206/178/171 left and 170 right down
+  to 0.01, exactly; **at 0, 124 / 124, the bare Dest**, and still 124 three seconds later.
+  The log has `Opacity 0.000000 at frame 2936` and the next line `Opacity 1.000000 at frame
+  3462` five seconds later, about 100 frames a second either side: **Arena keeps calling the
+  plugin at Opacity 0 and discards its picture**, showing the layers below as they are. No
+  crossfade on top at other values (0.5 is the plugin's own 206/170, not a mix with 124).
+- `DeInitGL after 3984 frames, last Opacity 1.000000` when the layers were deleted.
+
+**Windows: Arena 7.27.1 15990 on win-lab, Mesa llvmpipe (LLVM 22.1.8, GL 4.5 core, Mesa
+26.2.0).** The `Scrim.dll` from release.yml's workflow_dispatch run 44282176201 on 34811c3
+(wincheck: SM01, mixer, 20 parameters, Linear Light first, inputs 2 to 2), deployed with
+plugin-bench's `winlab.sh deploy`; the same probe at 1280x720 (layer 3, Blend Mode SW Scrim,
+over layer 2, layer 1's opacity at 0; everything restored after).
+- Offered in the Blend Mode list; 19 of 20 parameters shown, Linear Light the missing one.
+- The log: `first frame: Dest 1280x720 of 1280x768, Src 1280x720 of 1280x768, out 1280x720`;
+  fader 0.2, 0.85, 0.5, 1.0 logged as Opacity at frames 64, 92, 119, 140 (llvmpipe runs Arena
+  at 5 to 9 frames a second); REST 0.15 on the mixer's Opacity read back 1.0.
+- Defaults on the stage/projection stills: mean 1.4 levels from `smtest --pipe` (p99 21, at
+  the weave's texture under JPEG at 1280x720); two snapshots a moment apart: 0.0.
+- Premultiplied, as on the Mac: **231 / 83**.
+- Opacity: 235/206/171 left and 170 right at fader 1/0.5/0.01, exactly smtest; **at 0, 124 /
+  124, the bare Dest**. Unlike 7.29.0 on the Mac, the log has no `Opacity 0.000000` line: the
+  last value before the fader returned to 1 was `0.010000 at frame 454`, and the mixer's
+  Opacity read 0.01 over REST at fader 0. So 7.27.1 never handed Scrim an Opacity of 0;
+  whether it stopped calling it is not settled (the frame count at llvmpipe's rate cannot
+  tell). The picture at 0 is the same on both.
 
 ## Open questions for Allan
 
@@ -388,19 +452,29 @@ pixel. Never measured inside Resolume; 4K not run.
    gentler. Should Back Light default lower still, so a gauze reads opaque on first load?
 2. **The output is clamped to [0, 1]** before encoding. Arena composites in 8 bits, so nothing
    above 1 would survive anyway; a soft knee would keep highlights' colour.
-3. **Straight or premultiplied inputs?** Both are read as straight (the fleet's reading of
-   Arena's DXV clips through ffmpeg). Whether Arena hands a mixer straight or premultiplied
-   textures is unmeasured; the fleet's mixers are split.
-4. **Does Arena bypass a mixer at layer Opacity 0?** If it does, the reveal's last step (the
-   projector off, the scene through) never reaches the plugin.
+3. **Arena hands a mixer premultiplied inputs** (answered 2026-11-18, above). Scrim reads
+   straight, so a part-transparent texel's light is multiplied by its alpha twice. Should a
+   v0.2 read premultiplied (divide by alpha where alpha > 0, or take `rgb` as the light)?
+   The fleet's mixers were split; Arena's answer settles it for Arena, not for every host.
+4. **Arena skips a mixer's picture at layer Opacity 0** (answered, above): 7.29.0 on the Mac
+   still runs the plugin but shows the layers below untouched; 7.27.1 on Windows never hands it
+   0 and shows the same. Nothing in the plugin can change that; the
+   guide says to stop at 1%.
 5. **ShowTex's luminance factor's geometry.** ρ = 0.35/(1 − φ) assumes the chart was measured
    over a dark ground at the sheet's angles; the sheet does not say.
+6. **Draw Mesh's moiré is a regular striped pattern.** On a plain white projection at Front
+   Light 2 the beat measured 21 to 39 cd/m² between light and dark stripes (white as 200,
+   blurred 2 px so the pixel grid drops out), dark stripes near 120: past ITU-R BT.1702's and
+   Ofcom's pattern thresholds when it covers more than a quarter of the screen. The release
+   video keeps it to a fifth of the frame and the docs say so; Draw Mesh defaults on. Should
+   it default off, or the moiré's contrast be capped?
 
 ## Not verified
 
-- Never loaded into Resolume (either platform); index 0 hidden and Opacity on the fader are
-  measured on other mixers, not this one. Never built on Windows.
-- No llvmpipe, no other GPU.
+- In Resolume on test stills only (below): no real clips through a show, no timing inside
+  Resolume.
+- No other GPU. llvmpipe only inside Arena on win-lab, over test stills (above); the harness's
+  checks have not run there.
 - The physics is checked against the model, not against a gauze: no photograph or
   measurement of a real scrim was compared.
 - The spill's blur at the default 9.5 m gauze is under a pixel (0.51 px radius at 1920 wide,

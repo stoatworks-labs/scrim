@@ -5,7 +5,7 @@ A theatre gauze, for Resolume Arena/Avenue, as one FFGL **mixer**: a projection 
 the audience sees is the light the threads reflect plus the light through the holes; the
 projection's light through the holes lands on the set, magnified, dimmer and out of focus;
 the weave beats against the projector's pixels. C++/GLSL, CMake MODULE → universal `.bundle`
-(macOS). MIT.
+(macOS) + Windows `.dll`. MIT.
 
 | id | display name | bundle | type | inputs |
 | --- | --- | --- | --- | --- |
@@ -21,8 +21,10 @@ its "As built" section says where the code departs from it.
 - Configure: `cmake -B build -DCMAKE_BUILD_TYPE=Release`
 - Fast dev build: add `-DCMAKE_OSX_ARCHITECTURES=arm64` (iteration builds here are arm64)
 - Build: `cmake --build build -j8`
-- Install to Resolume: `cmake --install build` (into Arena's Extra Effects). Not run on this
-  machine: the plugin has never been loaded into Resolume.
+- Install to Resolume: `cmake --install build` (into Arena's Extra Effects). Arena on this
+  Mac opens Allan's current show composition and may be in use: only when it is not
+  running, add two layers for the test, delete them, and quit with Quit, never Save & Quit
+  (the .avc's mtime is the check). AGENTS.md has what Arena showed.
 - Render offline: `./build/smtest --out /tmp/scrim.png` (the `stage` card as Dest, the
   `projection` card as Src, on the defaults, which clip on these cards)
 - Inputs: `--input-a NAME` (Dest) and `--input-b NAME` (Src), each one of `stage stage-alpha
@@ -98,8 +100,11 @@ its "As built" section says where the code departs from it.
 - The fleet checkout is `~/Projects/resolume/scrim`; work on it in a worktree.
 
 ## Not done yet
-- Never loaded in Resolume (either platform); never built on Windows.
-- No user guide, no OpenFX port, no presets.
+- Loaded in Resolume Arena 7.29.0 (Mac) and 7.27.1 (Windows, llvmpipe) on test stills only (README Status): never with
+  real clips through a show, never timed inside Resolume.
+- Arena hands a mixer premultiplied inputs and Scrim reads straight (AGENTS.md, open
+  question 3); at layer Opacity 0 Arena shows the layers below instead of Scrim's picture.
+- No OpenFX port, no presets.
 - Browser demo: `demo/` is <https://scrim-demo.stoatworks-labs.com>, redeployed by
   `deploy.yml` on a push to main (a route over a proxied AAAA 100:: record: `wrangler.toml`).
   After a shader edit run `python3 demo/tools/check_shaders.py --write`; after a change to

@@ -1,9 +1,9 @@
 # scrim
 
 > **AI-assisted project.** This codebase was created with [Claude](https://claude.com/claude-code)
-> (Anthropic), directed and reviewed by a human author. It has **never been loaded into
-> Resolume**, on macOS or Windows, and has never been built on Windows. Everything below is
-> measured by an offline harness, `smtest`, that drives the real plugin class in a headless
+> (Anthropic), directed and reviewed by a human author. It has been loaded into Resolume
+> Arena on a Mac and on Windows and drew what the harness draws, on test stills (see
+> [Status](#status)). Everything else below is measured by an offline harness, `smtest`, that drives the real plugin class in a headless
 > GL context with two inputs, at 1280×720 and 320×180, on this Mac's GPU and again on Apple's
 > software renderer, and reads the light off the plugin's float output. With nothing behind
 > the gauze lit, the projection comes back with **0** of 5,529,600 floats different; a dark
@@ -14,6 +14,18 @@
 > of the plugin and **39** one-character mutants of its GLSL and C++ are all caught. That the
 > threads pass no light, that the set is one flat plane, and that ShowTex's luminance factor
 > was measured over a dark ground are **assumptions**: see [What it leaves out](#what-it-leaves-out).
+
+> **Photosensitivity note.** Scrim makes no flash of its own, but at its defaults its lights
+> brighten both pictures about four times, so a clip's own pulses can come out as large
+> changes of brightness. Over 33 pairs of Resolume's demo clips (8 s each, xenon's rule: more
+> than six transitions in any second, over the whole frame or any third of it), two pairs went
+> over three flashes a second through it at the defaults (8 in a third of the frame; 6 and 4
+> on their own). Stepping Front Light and Back Light about four times a second put 6 of the 33
+> pairs over, and about eight times a second 27. With Draw Mesh on, the weave's moiré is a
+> regular pattern of fine stripes, past the broadcast guidance for such patterns when it fills
+> much of the screen on a plain bright projection; Draw Mesh off removes it. Flashing light and
+> striped patterns can trigger seizures in people with photosensitive epilepsy: the
+> [user guide](https://stoatworks-labs.com/software/scrim/guide/#flashing) has the table.
 
 A theatre gauze, for [Resolume](https://resolume.com) Arena and Avenue, as an FFGL
 **mixer**, **SW Scrim**. Set it as the blend mode of the layer that holds what the projector
@@ -79,8 +91,7 @@ cmake --build build -j8
 ./build/smtest --out /tmp/scrim.png         # the defaults, offline
 ```
 
-`cmake --install build` copies `Scrim.bundle` into Arena's Extra Effects. Not done on this
-machine. `./build/smtest --bench` times it: on an M4 Max, about 0.2 ms a frame at 1080p at
+`cmake --install build` copies `Scrim.bundle` into Arena's Extra Effects. `./build/smtest --bench` times it: on an M4 Max, about 0.2 ms a frame at 1080p at
 the defaults on the GPU's clock, 2.3 ms with the biggest defocus disc the controls allow
 (noisy on a shared GPU; see AGENTS.md). Full verification: `TMPDIR=<scratch> OXBOW=<a built oxbow> tools/verify.sh`. See
 [AGENTS.md](AGENTS.md) for every check, its tolerance and where the tolerance comes from.
@@ -106,9 +117,61 @@ is the plugin's. It is a demo, not the plugin, and says on the page what it leav
 
 ## Status
 
-Public at `stoatworks-labs/scrim` since 2026-11-18, released at v0.1.0; never loaded into
-Resolume yet. MIT; see
-[LICENSE](LICENSE) and [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
+**v0.1.0, 18 November 2026, and early days.** It has been loaded into Resolume Arena
+on a Mac (7.29.0) and on Windows (7.27.1) and drew what the harness draws, but only over test stills: never with real
+clips through a show, never timed inside Resolume. The macOS build is Developer ID-signed and
+notarised. `oxbow probe` reads the bundle as a host does (`SW Scrim` / `SM01` / **mixer**,
+two inputs, parameter 0 Linear Light, a standard parameter named Opacity), and `oxbow
+selftest`, an effect host that hands the plugin one input, is refused on its first frame, as a
+mixer must refuse it. There's a [user guide](docs/USER-GUIDE.md) and a
+[browser demo](#browser-demo), but no OpenFX port and no presets.
+
+### In Resolume
+
+The fleet's Arena gate cannot gate a mixer, so SW Scrim was mounted by hand over Arena's REST
+API and read through its own log and Arena's composition snapshot, on 18 November 2026.
+
+![A rainbow of rings, very bright, washed to white over most of the lower half, with a faint
+grid showing through, as Resolume Arena's own composition snapshot shows it](docs/arena.jpg)
+
+<sub>SW Scrim on its defaults inside Resolume Arena 7.29.0 on a Mac, from Arena's composition
+snapshot over REST: the harness's grid card as a still on one layer (the scene), its ring card
+on the layer above, whose Blend Mode is SW Scrim. Both lights at their defaults clip most of
+the frame. It matches `smtest --pipe` on the same two stills to a mean of 1.07 levels.</sub>
+
+- **macOS: Arena 7.29.0, Apple M4 Max**, a local universal build of this source. Offered in
+  a layer's Blend Mode list; 18 of its 19 parameters shown, Linear Light the hidden one; the
+  layer's opacity fader logged as the plugin's Opacity (0.2, 0.85, 0.5, 1.0), and a REST write
+  to the mixer's own Opacity overridden; inputs padded to 1920x1088. Two snapshots a moment
+  apart are identical.
+- **Windows: Arena 7.27.1 on a test PC with no GPU** (Mesa's llvmpipe), the DLL that
+  release.yml built from this source. Offered in the Blend Mode list; 19 of its 20 parameters
+  shown, Linear Light the hidden one (the About block's User guide button makes 20); the
+  fader logged as Opacity, a REST write to the mixer's Opacity overridden; inputs padded to
+  1280x768. At the defaults on the same two stills it matches `smtest --pipe` to a mean of 1.4
+  levels in Arena's JPEG snapshot. The two findings below hold there too, level for level:
+  231 and 83 for the half-alpha still, and the bare scene (124) at a fader of 0, where Arena
+  7.27.1 never handed Scrim an Opacity of 0 (its log's last value was 0.01).
+- **Arena hands a mixer premultiplied pictures; Scrim reads straight.** A still of white at
+  alpha 1 and 0.5, over black, with the lights set so nothing clips: the harness predicts 231
+  and 170 for straight input, 83 for premultiplied, and Arena showed **231 and 83**. So a
+  part-transparent pixel, on either layer, gives its light times its alpha twice: white at
+  half alpha gives about a fifth of the light it should. Opaque clips are exact and fully
+  transparent pixels give nothing either way. Use opaque clips, or flatten one with alpha onto
+  black first.
+- **At a layer opacity of exactly 0, Arena shows the layers below as they are.** The plugin's
+  log shows Arena still calling it every frame at Opacity 0, but the composition showed the
+  bare scene (124 on a grey still where the plugin's picture was 170, its Back Light on the
+  scene). At 0.01, 0.1, 0.5 and 1 the snapshot was the plugin's own picture, level for level.
+  So the reveal's last step, the projector off and the scene lit through the gauze, is at 1%,
+  not 0: at 0 the gauze, the Back Light and the Wash vanish at once.
+
+The defaults are bright: each light alone fills the range on the middle one of Resolume's
+demo clips, which is a dark clip, so a bright clip clips and both together clip most of the
+frame (the snapshot above). The output is clamped to white before encoding. These, the
+assumptions in [What it leaves out](#what-it-leaves-out) and the two Arena findings above are
+in the user guide's known limits. MIT; see [LICENSE](LICENSE) and
+[ATTRIBUTIONS.md](ATTRIBUTIONS.md).
 
 <!-- attributions:start -->
 This project is built on other people's work — see [ATTRIBUTIONS.md](ATTRIBUTIONS.md).
