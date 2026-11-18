@@ -5,8 +5,8 @@
 # Each step answers a question none of the others can:
 #
 #   source        GLSL reserved words declared as identifiers, M_PI, the
-#                 built-ins GLSL ES 3.00 lacks, no workflow files, and the
-#                 FFGL SDK still at the fleet's pin
+#                 built-ins GLSL ES 3.00 lacks, and the FFGL SDK still at the
+#                 fleet's pin
 #   shaders       do the two shaders (the vertex shader and the screen pass)
 #                 compile through a real GLSL compiler (tools/glslc.sh),
 #                 before a host has to find out. glslc is REQUIRED here: a
@@ -110,13 +110,6 @@ if command grep -nE '(^|[^A-Za-z_])(findMSB|findLSB|bitCount|bitfieldExtract|bit
 	fail "a built-in GLSL ES 3.00 lacks is in the GLSL"
 else
 	pass "no built-in GLSL ES 3.00 lacks"
-fi
-# No GitHub workflows: the repo is local and may become a private one, and
-# the fleet's private repos share one small Actions allowance.
-if [ -d .github/workflows ] && [ -n "$( ls -A .github/workflows 2>/dev/null )" ]; then
-	fail "there are workflow files in .github/workflows -- this repo builds and tests locally"
-else
-	pass "no GitHub workflows"
 fi
 pin=$( git -C external/ffgl rev-parse --short=7 HEAD 2>/dev/null )
 if [ "$pin" = "b1afaf9" ]; then

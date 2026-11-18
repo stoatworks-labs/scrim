@@ -69,8 +69,11 @@ fills the range, each alone (`tools/clips.py defaults`). Both at once clip.
 
 ## Build
 
+From a checkout with its submodule (`git clone --recursive
+https://github.com/stoatworks-labs/scrim`, or `git submodule update --init --recursive` in an
+existing clone):
+
 ```sh
-git submodule update --init
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j8
 ./build/smtest --out /tmp/scrim.png         # the defaults, offline
@@ -92,5 +95,6 @@ clamped to [0, 1] and is always opaque.
 
 ## Status
 
-Local only: no remote, nothing released, never loaded into Resolume. MIT; see
+Public at `stoatworks-labs/scrim` since 2026-11-18, released at v0.1.0; never loaded into
+Resolume yet. MIT; see
 [LICENSE](LICENSE) and [ATTRIBUTIONS.md](ATTRIBUTIONS.md).

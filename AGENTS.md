@@ -5,7 +5,8 @@ Read this before touching the screen pass (`source/Shaders.cpp`: `lightAt`, `spi
 clamp, index 0, the two lights' defaults, or any tolerance in `tools/smtest/main.cpp`. Read
 genlock's AGENTS.md (mixer section) before touching `ProcessOpenGL`'s inputs. The design is
 `~/Projects/resolume/specs/SPEC-scrim.md`; its "As built" section says where the code departs
-from it, and is restated at the end of this file.
+from it, and is restated at the end of this file. Built 2026-11-17, local only; public at
+`stoatworks-labs/scrim` since 2026-11-18.
 
 ## The model, as built
 

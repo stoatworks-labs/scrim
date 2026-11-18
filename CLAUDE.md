@@ -86,8 +86,14 @@ its "As built" section says where the code departs from it.
 - `smtest`'s `fmt()` takes doubles only: never pass it a `%s` or `%d` format.
 - **Provisional hand copies:** `source/StoatworksAbout*.h` (guide = "", no user guide yet)
   and `ATTRIBUTIONS.md`.
-- **No workflows, and none to add**: the repo has no remote and may stay private.
-- Local only: `~/dev/scrim`, no remote, nothing released, not on the website.
+- **The workflows.** The repo is public (`stoatworks-labs/scrim`, since 2026-11-18), which
+  is what allows Actions. `ci.yml` builds on macOS and Windows on every push and pull
+  request; `release.yml` (penumbra's, xenon's shape, with pepper's `tools/wincheck.ps1`)
+  builds the universal bundle and the Windows DLL, loads the DLL as a host would, and on a
+  `v*` tag publishes the zips, the dmg and the installer. A `workflow_dispatch` run builds
+  without publishing. `scripts/release-lib.sh` is stoatworks-backend's
+  `release/release-lib.sh`, verbatim.
+- The fleet checkout is `~/Projects/resolume/scrim`; work on it in a worktree.
 
 ## Not done yet
 - Never loaded in Resolume (either platform); never built on Windows.
