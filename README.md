@@ -66,6 +66,15 @@ macOS builds are signed and notarised and open normally. The Windows builds are 
 
 <!-- downloads:end -->
 
+## Video
+
+> **Photosensitivity warning:** this effect can turn a clip's flicker into flashing, stepping its
+> lights quickly flashes, and its weave makes fine striped patterns. Large-area flashes in the
+> video are kept to three a second or fewer, and the weave's moire is kept to a box a fifth of the
+> picture.
+
+[![Scrim: a theatre gauze for Resolume, a screen or a window by its light](docs/video-thumb.png)](https://www.youtube.com/watch?v=JtixMqXyt4g)
+
 ## The one idea
 
 **What the audience sees at a point of the gauze is the light its threads reflect plus the
